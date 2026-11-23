@@ -1034,33 +1034,49 @@ def led(name, col):
 
 
 # ---- backdrop bodies ----------------------------------------------------------
-def planet(name):
-    m = Model(name, bevel=0, lods=(1.0, .5, .25), ao=False, auto_smooth=180)
-    g = m.part('sphere')
+def _sphere_lods(m, g):
+    m.alt = {}
+    for lod, (nu, nv) in ((1, (48, 28)), (2, (32, 18))):
+        q = Geo()
+        q.sphere((0, 0, 0), 1.0, nu, nv, 'steel')
+        m.alt[lod] = q
     g.sphere((0, 0, 0), 1.0, 72, 40, 'steel')
+
+
+def planet(name):
+    m = Model(name, bevel=0, ao=False, auto_smooth=180)
+    _sphere_lods(m, m.part('sphere'))
     return m
 
 
 def sky():
-    m = Model('sky', bevel=0, lods=(1.0, .5, .25), ao=False, auto_smooth=180)
-    m.part('sphere').sphere((0, 0, 0), 1.0, 48, 28, 'steel')
+    m = Model('sky', bevel=0, ao=False, auto_smooth=180)
+    _sphere_lods(m, m.part('sphere'))
     return m
 
 
-def planet_ring(name, a, b):
-    m = Model(name, bevel=0, lods=(1.0, .5, .25), ao=False, auto_smooth=20)
-    g = m.part('ring')
+def _ring_geo(g, a, b, segments):
     n = 14
     radii = [1.42 + i / n * .84 for i in range(n + 1)]
     th = .006
     prof = [(th, r) for r in radii] + [(-th, r) for r in reversed(radii)] + [(th, radii[0])]
     bands = [a, b, a, 'scorch', b, b, a, 'scorch', a, b, b, a, 'scorch', b]
-    g.lathe(prof, 96, bands + ['scorch'] + bands[::-1] + ['scorch'], axis='y', caps=False)
+    g.lathe(prof, segments, bands + ['scorch'] + bands[::-1] + ['scorch'], axis='y', caps=False)
+
+
+def planet_ring(name, a, b):
+    m = Model(name, bevel=0, ao=False, auto_smooth=20)
+    _ring_geo(m.part('ring'), a, b, 96)
+    m.alt = {}
+    for lod, seg in ((1, 72), (2, 48)):
+        q = Geo()
+        _ring_geo(q, a, b, seg)
+        m.alt[lod] = q
     return m
 
 
 def station(i):
-    m = Model(f'station{i}', bevel=.12, lods=(1.0, .5, .22))
+    m = Model(f'station{i}', bevel=.12, lods=(1.0, .82, .36))
     g = m.part('st')
     cols = [('steel', 'crimson', 'l_orange'), ('pale', 'teal', 'l_cyan'), ('gun', 'magenta', 'l_yellow'), ('steel', 'blue', 'l_white')][i]
     if i == 0:

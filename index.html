@@ -76,6 +76,11 @@
   #hMsg.warn { color: var(--bad); } #hMsg.warn small { color: #ffe9dc; }
   #hPick { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 850; font-size: 17px; color: #ffe07a; opacity: 0; text-shadow: 0 1px 2px #000; white-space: nowrap; }
   #hurt { position: absolute; inset: 0; border: 6px solid var(--bad); display: none; pointer-events: none; }
+  #xh { position: absolute; left: 0; top: 0; width: 58px; height: 58px; display: none; overflow: visible; color: #62ff86; will-change: transform; }
+  #xh.lock { color: #ffc21f; }
+  #xh path, #xh circle { fill: none; stroke-linecap: square; }
+  #xh .o path, #xh .o circle { stroke: #050810; stroke-width: 8; }
+  #xh .i path, #xh .i circle { stroke: currentColor; stroke-width: 3.6; }
   #tLabel { position: absolute; left: 0; top: 0; display: none; width: 70px; text-align: center; font-size: 12px; font-weight: 800; color: #ffd9a8; text-shadow: 0 1px 1px #000; will-change: transform; }
   #tBar { height: 4px; margin-top: 2px; background: #171c33; border: 1px solid #000; overflow: hidden; }
   #tHp { height: 100%; background: #ff9a3c; transform-origin: left; }
@@ -86,8 +91,8 @@
   #btnNova b { font-size: 24px; color: var(--accent); }
   #btnNova.empty { opacity: .4; border-color: var(--line); }
   @media (orientation: portrait) {
-    .hBL { bottom: auto; top: calc(62px + var(--sat)); left: calc(8px + var(--sal)); background: none; padding: 0; gap: 3px; }
-    .hRow span[data-t] { display: none; } .pip { width: 9px; height: 5px; }
+    .hBL { bottom: auto; top: calc(58px + var(--sat)); left: calc(8px + var(--sal)); background: rgba(6, 9, 20, .78); padding: 5px 7px; gap: 3px; font-size: 11px; color: #e4eaf8; }
+    .hRow span[data-t] { width: 44px; } .pip { width: 11px; height: 7px; background: #3a4468; }
     #hBoss { top: calc(36px + var(--sat)); }
     #btnNova { width: 66px; height: 66px; right: calc(10px + var(--sar)); bottom: calc(10px + var(--sab)); }
   }
@@ -120,6 +125,7 @@
       <div class="hRow"><span data-t="hGun"></span><span id="hGun" style="display:flex;gap:3px;width:auto"></span></div>
       <div class="hRow"><span data-t="hRkt"></span><span id="hRkt" style="display:flex;gap:3px;width:auto"></span></div>
     </div>
+    <svg id="xh" viewBox="-32 -32 64 64" aria-hidden="true"><g class="o"><path d="M0-29V-12M0 29V12M-29 0H-12M29 0H12"/><circle r="15"/><path d="M-1 0h2"/></g><g class="i"><path d="M0-29V-12M0 29V12M-29 0H-12M29 0H12"/><circle r="15"/><path d="M-1 0h2"/></g></svg>
     <div id="tLabel"><span id="tDist"></span><div id="tBar"><div id="tHp"></div></div></div>
     <div id="hMsg"></div>
     <div id="hPick"></div>

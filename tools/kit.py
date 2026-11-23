@@ -430,10 +430,11 @@ def bake_lod(model, ratio, lod_index):
     for pi, part in enumerate(model.parts):
         if not part.geo.f:
             continue
-        ob = _new_object(part.geo, f'{model.name}_{part.name}')
+        alt = getattr(model, 'alt', {}).get(lod_index)  # clean authored LOD instead of decimating banded or round shapes
+        ob = _new_object(alt or part.geo, f'{model.name}_{part.name}')
         bevel = model.bevel if lod_index == 0 else model.bevel * .8 if lod_index == 1 else 0
         segs = model.segs if lod_index == 0 else 1
-        me = _evaluated(ob, bevel, segs, ratio)
+        me = _evaluated(ob, bevel, segs, 1.0 if alt else ratio)
         tl, tp, vi, co, nor, pal, fn, bone = _mesh_arrays(me, model.auto_smooth)
         corners = tl.reshape(-1)
         polys = np.repeat(tp, 3)

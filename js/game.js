@@ -133,7 +133,8 @@
   const bm = new Pool(8, { owner: null, ox: 0, oy: 0, oz: 0, tx: 0, ty: 0, tvx: 0, tvy: 0, t: 0, warn: .7, life: 1, w: 1, part: -1 });
 
   // ---------- state ----------
-  const XR = 30, YR = 17, SPAWN_Z = -560, PL_R = 2.7;
+  let XR = 30, SX = 1;
+  const YR = 17, SPAWN_Z = -560, PL_R = 2.7;
   const S = { mode: 'load', clock: 0, shake: 0, slow: 0, waveState: 'idle', waveT: 0, deadT: 0, gain: 0, novaT: -1, nx: 0, ny: 0, nz: 0, nvx: 0, nvy: 0, nvz: 0, sector: 0, flow: 0, hitT: 0, killT: 0 };
   const R = { score: 0, sector: 1, wave: 1, hull: 3, maxHull: 3, shield: 0, wpn: 1, rkt: 0, bombs: 2, chain: 0, combo: 1, comboT: 0, overT: 0, pity: 0 };
   const Pl = { x: 0, y: 0, vx: 0, vy: 0, rx: 0, ry: 0, bank: 0, pitch: 0, inv: 0, fireT: 0, rktT: 0, recoil: 0, muzzle: 0, alive: true, novaCd: 0, rktSide: 1, tg: null, firing: false, heat: 0, gunSide: 1, muzzleSide: 0, kick: 0 };
@@ -275,6 +276,7 @@
       vec3 col = alb * (.012 + lit * 1.5) + uAtm * uAtm * pow(1. - nv, 3.) * smoothstep(-.1, .4, l) * .55;
       gl_FragColor = vec4(sqrt(col / (1. + col * .3)), 1.); }`;
 
+  let bgK = 1, bgS = 1, bgY = 0;
   const coarse = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   const smallScreen = min(screen.width || 1000, screen.height || 1000) < 720;
   const TIER = (coarse && smallScreen) || /[?&]tier=phone(&|$)/.test(location.search) ? 'phone' : 'desktop';
@@ -575,6 +577,10 @@
     requestAnimationFrame(frame);
   }
 
+  function applyBackdropFrame() {
+    const s = SECTORS[S.sector];
+    planetMesh.position.set(s.pPos[0] * bgK, s.pPos[1] + bgY, s.pPos[2]); planetMesh.scale.setScalar(s.pS * bgS); planetMesh.updateMatrix(); planetMesh.updateMatrixWorld(true);
+  }
   function applySector(i, instant) {
     const s = SECTORS[i % 4];
     S.sector = i % 4;
@@ -584,7 +590,7 @@
     SkyU.uB.value = instant ? skyTex[i % 4] : SkyU.uA.value;
     SkyU.uA.value = skyTex[i % 4]; SkyU.uMix.value = instant ? 1 : 0; U.uEnv.value = skyTex[i % 4];
     PlanetU.uMap.value = planetTex[s.planet]; PlanetU.uAtm.value.set(s.atm[0], s.atm[1], s.atm[2]);
-    planetMesh.position.set(s.pPos[0], s.pPos[1], s.pPos[2]); planetMesh.scale.setScalar(s.pS); planetMesh.updateMatrix(); planetMesh.updateMatrixWorld(true);
+    planetMesh.position.set(s.pPos[0] * bgK, s.pPos[1] + bgY, s.pPos[2]); planetMesh.scale.setScalar(s.pS * bgS); planetMesh.updateMatrix(); planetMesh.updateMatrixWorld(true);
   }
 
   // ---------- spawning ----------
@@ -600,7 +606,10 @@
   }
   function Qs(at, type, x, y, path, a, b, c, d, e) {
     const s = sq.get(); if (!s) return;
-    s.t = at; s.type = type; s.x = x; s.y = y; s.path = path; s.a = a || 0; s.b = b || 0; s.c = c || 0; s.d = d || 0; s.e = e || 0;
+    // portrait: formations are narrowed to fit the taller, closer view
+    let qa = a || 0, qb = b || 0, qc = c || 0;
+    if (SX !== 1) { if (path === 0) qa *= SX; else if (path === 1 || path === 6) { qa *= SX; qc *= SX; } else if (path === 2) { qb *= SX; qc *= SX; } else if (path === 7) { qa *= SX; qb *= SX; } }
+    s.t = at; s.type = type; s.x = x * SX; s.y = y; s.path = path; s.a = qa; s.b = qb; s.c = qc; s.d = d || 0; s.e = e || 0;
   }
   // paths: 0 straight, 1 weave, 2 come in and hold, 3 side arc, 5 homing rocket, 6 corkscrew, 7 banking fly-past
   function patternDart(at, L) {
@@ -771,7 +780,7 @@
   function startBoss() {
     const ty = (R.sector - 1) % 3, lvl = 1 + (R.sector - 1) * .55;
     Object.assign(B, { active: true, dead: false, type: ty, x: 0, y: 2, z: -640, t: 0, state: 'enter', phase: 0, atk: -1, cur: null, sub: 0, subI: 0, subT: 1, flash: 0, dieT: 0, boomT: 0 });
-    B.r = [24, 21, 25][ty]; B.maxHp = B.hp = round([260, 340, 420][ty] * lvl); B.nparts = ty === 1 ? 3 : 2;
+    B.baseZ = ckTall ? -166 : -128; B.r = [24, 21, 25][ty]; B.maxHp = B.hp = round([260, 340, 420][ty] * lvl); B.nparts = ty === 1 ? 3 : 2;
     for (let i = 0; i < 3; i++) { const p = B.parts[i], on = i < B.nparts; p.alive = on; p.max = p.hp = round((ty === 1 ? 46 : 56) * lvl); p.flash = 0; p.r = ty === 1 ? 8 : 11.5; p.x = 0; p.y = 0; p.z = -700; p.ang = 0; }
     showMsg('warning', 'boss' + ty, 2.6, true); Snd.play('warn');
     $('hBossName').textContent = t('boss' + ty); $('hBoss').style.display = 'block'; hudBoss = -1;
@@ -803,7 +812,7 @@
       B.z += (B.baseZ - B.z) * min(1, dt * 1.4);
       if (B.baseZ - B.z < 3) { B.state = 'fight'; B.t = 0; }
     } else if (B.state === 'fight') {
-      B.x = sin(B.t * (.44 + B.phase * .08)) * 15; B.y = 3 + sin(B.t * .9) * 5; B.z = B.baseZ + sin(B.t * .6) * 10;
+      B.x = sin(B.t * (.44 + B.phase * .08)) * 15 * SX; B.y = 3 + sin(B.t * .9) * 5; B.z = B.baseZ + sin(B.t * .6) * 10;
       B.subT -= dt;
       let guard = 0;
       while (B.subT <= 0 && guard++ < 4 && Pl.alive) {
@@ -999,7 +1008,8 @@
   // ---------- player and aiming ----------
   // The crosshair is a true screen point. Its camera ray gives the convergence point every gun fires at.
   let tanV = .6, tanH = 1, ckShift = 0, ckTall = 0, ckScissor = 1;
-  const SHOT_SPEED = 1050, CONVERGE = 320;
+  const SHOT_SPEED = 1050;
+  let CONVERGE = 300, ENGAGE = 330, ES = 1;
   const aim = { x: 0, y: 0, z: -CONVERGE, dx: 0, dy: 0, dz: -1, lock: null, lx: 0, ly: 0, lz: 0, hasLead: false };
   const MZ = [-2.1, 2.1];
   const P = { x: 0, y: 0, w: 1 };
@@ -1025,12 +1035,12 @@
     const asp = tanH / tanV, reach = ptr.mouse ? .13 : .2;
     let best = null, bd = reach * reach;
     const test = (o, r, rockPenalty) => {
-      if (o.z > ez - 10 || o.z < -520) return;
+      if (o.z > ez - 10 || o.z < ez - ENGAGE) return;
       project(o.x, o.y, o.z); if (P.w < 8 || abs(P.x) > 1.05 || abs(P.y) > 1.05) return;
       const sx = (P.x - Pl.rx) * asp, sy = P.y - Pl.ry, rad = r / P.w / tanV, d = max(0, hypot(sx, sy) - rad * .7), q = d * d * rockPenalty;
       if (q < bd) { bd = q; best = o; }
     };
-    for (let i = 0; i < en.n; i++) { const e = en.a[i]; if (!e.dead) test(e, e.def.r * e.def.s, e.def.rock !== undefined ? 1.5 : 1); }
+    for (let i = 0; i < en.n; i++) { const e = en.a[i]; if (!e.dead) test(e, e.def.r * e.def.s * ES, e.def.rock !== undefined ? 1.5 : 1); }
     if (B.active && B.state === 'fight') { for (let j = 0; j < B.nparts; j++) if (B.parts[j].alive) test(B.parts[j], B.parts[j].r * B.s, .8); test(B, B.r * B.s, 1.1); }
     aim.lock = best; aim.hasLead = false;
     if (best) {
@@ -1100,7 +1110,7 @@
   function nearestTarget(x, y, z) {
     let best = null, bd = 1e12;
     for (let i = 0; i < en.n; i++) {
-      const e = en.a[i]; if (e.dead || e.z > -8 || e.z < -470) continue;
+      const e = en.a[i]; if (e.dead || e.z > -8 || e.z < -ENGAGE - 30) continue;
       const dx = e.x - x, dy = e.y - y, dz = e.z - z, q = (dx * dx + dy * dy + dz * dz) * (e.def.rock !== undefined ? 2.4 : 1);
       if (q < bd) { bd = q; best = e; }
     }
@@ -1183,7 +1193,7 @@
       for (let j = 0; j < en.n; j++) {
         const e = en.a[j]; if (e.dead || e.z > 4) continue;
         if (b.z > e.z + 26 + e.def.r || oz < e.z - 26 - e.def.r) continue;
-        if (!segHit(ox, oy, oz, mx, my, mz, e.x, e.y, e.z, e.def.r * (.9 + -e.z * .0012))) continue;
+        if (e.z < -ENGAGE - 20 || !segHit(ox, oy, oz, mx, my, mz, e.x, e.y, e.z, e.def.r * ES * (.9 + -e.z * .0012))) continue;
         used = true;
         const hs = 1 + -e.z * .005, ix = e.x + (b.x - e.x) * .45, iy = e.y + (b.y - e.y) * .45, iz = e.z + e.def.r * .7;
         S.hitT = .14;
@@ -1262,7 +1272,7 @@
           break;
         case 3: {
           const u = e.t * e.b;
-          e.x = -e.a * 64 + e.a * 128 * u; e.y = e.d + sin(u * PI) * e.c; e.z = SPAWN_Z * .32 + sin(u * PI) * 60 - 34 - (1 - u) * 110 + u * 118;
+          e.x = (-e.a * 64 + e.a * 128 * u) * SX; e.y = e.d + sin(u * PI) * e.c; e.z = SPAWN_Z * .32 + sin(u * PI) * 60 - 34 - (1 - u) * 110 + u * 118;
           if (u > 1.02) e.dead = true;
           break;
         }
@@ -1306,7 +1316,7 @@
     }
   }
   function updBullets(dt) {
-    for (let i = 0; i < pb.n; i++) { const b = pb.a[i]; b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt; if (b.z < -600) b.dead = true; }
+    for (let i = 0; i < pb.n; i++) { const b = pb.a[i]; b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt; if (b.z < -ENGAGE - 45) b.dead = true; }
     for (let i = 0; i < eb.n; i++) { const b = eb.a[i]; b.t += dt; b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt; if (b.z > 10) b.dead = true; }
   }
   function updPickups(dt) {
@@ -1350,6 +1360,7 @@
   // ---------- hud (DOM only touched when a value changes, no per-frame strings) ----------
   let hudScore = -1, hudCombo = -1, hudWaveKey = -1, hudWave = '', hudBoss = -1, hudNova = -1, hudPips = -1, hurtShown = 0, lblKey = -1, lblOn = false, lblT = 0;
   function hudReset() { hudScore = hudCombo = hudBoss = hudNova = hudPips = hudWaveKey = lblKey = -1; hudWave = ''; }
+  let xhX = -1, xhY = -1, xhLk = -1, xhVis = null;
   function pipRow(el, n, on, cls) { let h = ''; for (let i = 0; i < n; i++) h += '<i class="pip' + (i < on ? ' ' + cls : '') + '"></i>'; el.innerHTML = h; }
   function drawHud(dt) {
     if (R.score !== hudScore) { hudScore = R.score; $('hScore').textContent = R.score.toLocaleString(lang); }
@@ -1363,12 +1374,20 @@
     if (msgLife > 0) { msgT += dt; if (msgT > msgLife) { msgLife = 0; $('hMsg').style.opacity = 0; } else if (msgT > msgLife - .35) $('hMsg').style.opacity = (msgLife - msgT) / .35; }
     if (pickT > 0) { pickT -= dt; if (pickT <= 0) $('hPick').style.opacity = 0; else if (pickT < .3) $('hPick').style.opacity = pickT / .3; }
     if (hurtT > 0 || hurtShown) { hurtT = max(0, hurtT - dt); const v = round(hurtT / .34 * 10) / 10; if (v !== hurtShown) { hurtShown = v; const el = $('hurt'); el.style.display = v > 0 ? 'block' : 'none'; el.style.opacity = v * .75; } }
+    { // crosshair: outlined vector mark, readable on any background
+      const xh = $('xh'), vis = Pl.alive, cx = round((Pl.rx * .5 + .5) * innerWidth), cy = round((.5 - Pl.ry * .5) * innerHeight), lk = aim.lock ? 1 : 0;
+      if (vis !== xhVis) { xhVis = vis; xh.style.display = vis ? 'block' : 'none'; }
+      if (cx !== xhX || cy !== xhY) { xhX = cx; xhY = cy; xh.style.transform = 'translate3d(' + cx + 'px,' + cy + 'px,0) translate(-50%,-50%)'; }
+      if (lk !== xhLk) { xhLk = lk; xh.classList.toggle('lock', !!lk); }
+    }
     // target readout: distance and health next to the lock brackets
     const g = aim.lock, el = $('tLabel');
     if (g && Pl.alive) {
       project(g.x, g.y, g.z);
       const rad = (g.def ? g.def.r * g.def.s : g.r * B.s) / max(P.w, 1) / tanV;
-      const px = (P.x * .5 + .5) * innerWidth, py = (.5 - (P.y + rad * 1.14) * .5) * innerHeight;
+      const px = (P.x * .5 + .5) * innerWidth, cxx = (Pl.rx * .5 + .5) * innerWidth, cyy = (.5 - Pl.ry * .5) * innerHeight;
+      let py = (.5 - (P.y + rad * 1.14) * .5) * innerHeight;
+      if (abs(px - cxx) < 86 && py > cyy - 34 && py < cyy + 52) py = cyy - 34; // keep the readout clear of the crosshair
       el.style.transform = 'translate3d(' + round(clamp(px, 46, innerWidth - 46)) + 'px,' + round(max(py, 60)) + 'px,0) translate(-50%,-100%)';
       if (!lblOn) { lblOn = true; el.style.display = 'block'; }
       lblT -= dt;
@@ -1394,8 +1413,8 @@
     PlanetU.uSpin.value += dt * .012;
     const st = BT['station' + s.station];
     eulerQ(.25, S.clock * .05, S.clock * .035);
-    st.push(s.sPos[0], s.sPos[1], s.sPos[2], Q.x, Q.y, Q.z, Q.w, s.sS, 0, 0, 0, 1);
-    if (s.ring) { const r = BT[s.ring]; eulerQ(.42, .2, -.3); r.push(s.pPos[0], s.pPos[1], s.pPos[2], Q.x, Q.y, Q.z, Q.w, s.pS, 0, 0, 0, 0); }
+    st.push(s.sPos[0] * bgK, s.sPos[1], s.sPos[2], Q.x, Q.y, Q.z, Q.w, s.sS * (ckTall ? .8 : 1), 0, 0, 0, LOW ? 0 : 1);
+    if (s.ring) { const r = BT[s.ring]; eulerQ(.42, .2, -.3); r.push(s.pPos[0] * bgK, s.pPos[1] + bgY, s.pPos[2], Q.x, Q.y, Q.z, Q.w, s.pS * bgS, 0, 0, 0, 0); }
     const b = BT.dust, sp = moving ? 150 : 34, e = U.uEye.value, ls = 1.2 + sp * .03;
     for (let i = 0; i < DUST_N; i++) {
       let z = dust[i * 3 + 2] + sp * dt;
@@ -1409,7 +1428,7 @@
     const tm = S.clock;
     for (let i = 0; i < en.n; i++) {
       const e = en.a[i]; if (e.dead) continue;
-      const d = e.def, fade = min(1, e.t * 3 + .15), s = d.s * fade * (d.rock !== undefined ? 1.25 : 1.42);
+      const d = e.def, fade = min(1, e.t * 3 + .15), s = d.s * fade * ES * (d.rock !== undefined ? 1.25 : 1.42);
       if (d.rock !== undefined) {
         eulerQ(e.rx, e.ry, e.rz);
         BT[ROCK_NAMES[e.type][e.vr]].push(e.x, e.y, e.z, Q.x, Q.y, Q.z, Q.w, s, 0, 0, e.flash > 0 ? 1 : 0);
@@ -1431,9 +1450,9 @@
       const b = pb.a[i]; if (b.dead) continue;
       aimQ(b.vx, b.vy, b.vz);
       // hot tracer: starts short at the muzzle and reaches full length within a few frames
-      const bb = b.heavy ? BT.tr_h : BT.tr_p, len = min(b.t * SHOT_SPEED * .92 + 1.6, b.heavy ? 21 : 17), back = len * .46 / SHOT_SPEED;
+      const bb = b.heavy ? BT.tr_h : BT.tr_p, dc = -b.z, len = min(b.t * SHOT_SPEED * .92 + 1.6, b.heavy ? 21 : 17, dc * .3 + 1.5), back = len * .46 / SHOT_SPEED, nearW = clamp(dc / 70, .16, 1);
       bb.push(b.x - b.vx * back, b.y - b.vy * back, b.z - b.vz * back, Q.x, Q.y, Q.z, Q.w, 1, 0, 0, 0);
-      bb.stretch(b.heavy ? .4 : .28, len);
+      bb.stretch((b.heavy ? .4 : .28) * (LOW ? 1.5 : 1) * nearW, len);
     }
     for (let i = 0; i < eb.n; i++) {
       const b = eb.a[i]; if (b.dead) continue;
@@ -1473,16 +1492,16 @@
         const dx = aim.x - W1.x, dy = aim.y - W1.y, dz = aim.z - W1.z, l = sqrt(dx * dx + dy * dy + dz * dz);
         aimQ(dx, dy, dz);
         BT.aimline.push(W1.x + dx * .5, W1.y + dy * .5, W1.z + dz * .5, Q.x, Q.y, Q.z, Q.w, 1, 0, 0, 0, LOW ? 1 : 0);
-        BT.aimline.stretch(.011, l);
+        BT.aimline.stretch(LOW ? .018 : .015, l);
       }
     }
     if (Pl.alive && Pl.muzzle > 0) {
-      const ms = .34 + Pl.muzzle * 10;
+      const ms = .13 + Pl.muzzle * 3.2;
       aimQ(aim.dx, aim.dy, aim.dz);
       const qx = Q.x, qy = Q.y, qz = Q.z, qw = Q.w;
       for (let k = 0; k < 2; k++) {
         if (Pl.muzzleSide && (k === 1) !== (Pl.muzzleSide > 0)) continue;
-        worldOffset(MZ[k], -1.25, -3.6, W1);
+        worldOffset(MZ[k] * 1.25, -1.55, -5.4, W1);
         BT.bolt_muzzle.push(W1.x, W1.y, W1.z, qx, qy, qz, qw, ms, 0, 0, 0, 0);
       }
     }
@@ -1553,11 +1572,8 @@
   function drawOverlay(tm) {
     const asp = hudCamera.right, px = 2 / max(innerHeight, 1);
     if (!Pl.alive) return;
-    const locked = !!aim.lock;
-    const fireKick = Pl.recoil * 3 * px;
-    hudMark(BT.hud_cross, Pl.rx, Pl.ry, (locked ? 19 : 23) * px + fireKick, 0);
     if (aim.lock) {
-      const g = aim.lock, r = g.def ? g.def.r * g.def.s : g.r * B.s;
+      const g = aim.lock, r = g.def ? g.def.r * g.def.s * ES : g.r * B.s;
       project(g.x, g.y, g.z);
       const rad = clamp(r * 1.14 / max(P.w, 1) / tanV, 15 * px, .3);
       hudMark(BT.hud_lock, P.x, P.y, rad, 0);
@@ -1566,8 +1582,8 @@
         hudMark(BT.hud_lead, P.x, P.y, 10 * px, tm * 2.2);
       }
     }
-    if (S.hitT > 0) hudMark(BT.hud_hit, Pl.rx, Pl.ry, (15 + (1 - S.hitT / .14) * 7) * px, 0);
-    if (S.killT > 0) hudMark(BT.hud_kill, Pl.rx, Pl.ry, (22 + (1 - S.killT / .3) * 13) * px, 0);
+    if (S.hitT > 0) hudMark(BT.hud_hit, Pl.rx, Pl.ry, (20 + (1 - S.hitT / .14) * 5) * px, 0);
+    if (S.killT > 0) hudMark(BT.hud_kill, Pl.rx, Pl.ry, (23 + (1 - S.killT / .3) * 7) * px, 0);
     // arrows to the nearest threats outside the view
     let shown = 0;
     for (let pass = 0; pass < 2 && shown < 5; pass++) {
@@ -1635,7 +1651,7 @@
   let pr = 1, lastW = 0, lastH = 0, fitTimer = 0;
   function fit() {
     const w = innerWidth || 800, h = innerHeight || 600, asp = w / h;
-    const halfH = asp < 1.2 ? Math.atan(tan(27 * PI / 180) / max(asp, .4)) : 31 * PI / 180;
+    const halfH = asp < .8 ? Math.atan(tan(20.5 * PI / 180) / max(asp, .4)) : asp < 1.2 ? Math.atan(tan(27 * PI / 180) / asp) : 31 * PI / 180;
     const fov = clamp(halfH * 2 * 180 / PI, 56, 104);
     tanV = tan(fov * PI / 360); tanH = tanV * asp;
     lastW = w; lastH = h;
@@ -1648,6 +1664,9 @@
       ckShift = tall ? 1 - .6 / ckTanV : 0; ckCamera.projectionMatrix.elements[9] = ckShift;
       ckCamera.projectionMatrixInverse.copy(ckCamera.projectionMatrix).invert();
       ckTall = tall ? 1 : 0; ckScissor = tall ? .25 : 1;
+      SX = tall ? .66 : 1; XR = 30 * SX; ES = tall ? 1.24 : 1; ENGAGE = tall ? 235 : 330; CONVERGE = tall ? 210 : 300;
+      bgK = tall ? .62 : 1; bgS = tall ? .52 : 1; bgY = tall ? 210 : 0;
+      if (planetMesh) applyBackdropFrame();
       hudCamera.left = -asp; hudCamera.right = asp; hudCamera.top = 1; hudCamera.bottom = -1; hudCamera.updateProjectionMatrix();
     }
   }
