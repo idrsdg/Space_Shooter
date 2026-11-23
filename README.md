@@ -8,11 +8,10 @@
 
 ## Kontroller
 
-- Yön tuşları ya da WASD: hareket
-- Boşluk: ateş
-- Telefonda: parmağını sürükle, gemi kendi ateş eder
-- M: sesi kapat ya da aç
+- Klavye: yön tuşları ya da WASD ile uç, Boşluk ile ateş et, X ile Nova, P ile duraklat, M ile sesi aç ya da kapat
+- Fare: gemi imleci izler, sol tuş ateş, sağ tuş Nova
+- Telefon: parmağını sürükle, gemi kendi ateş eder, Nova sağ altta
 
-Üç canın var. Her dalgada tehlike sayısı artar, ikinci dalgadan sonra ateş eden düşman gemileri gelir.
+Her sektörde beş dalga ve bir boss var. Düşen kapsüller topu, roketleri ve kalkanı güçlendirir, hurdayla Hangar'dan kalıcı geliştirme alınır. İlerleme her dalgada kaydedilir. Oyun Türkçe ve İngilizce oynanır.
 
-Özgün Unity projesinin kaynağı kayboldu. Bu sürüm aynı kurallarla HTML ve JavaScript olarak yeniden yazıldı.
+Özgün Unity projesinin kaynağı kayboldu. Bu sürüm HTML ve JavaScript ile yeniden yazıldı, bağımlılığı yoktur.
