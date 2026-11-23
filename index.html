@@ -75,13 +75,22 @@
   #hMsg small { display: block; font-size: .55em; color: var(--cool); font-weight: 800; }
   #hMsg.warn { color: var(--bad); } #hMsg.warn small { color: #ffe9dc; }
   #hPick { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); font-weight: 850; font-size: 17px; color: #ffe07a; opacity: 0; text-shadow: 0 1px 2px #000; white-space: nowrap; }
-  #hurt { position: absolute; inset: 0; border: 7px solid var(--bad); opacity: 0; pointer-events: none; }
+  #hurt { position: absolute; inset: 0; border: 6px solid var(--bad); display: none; pointer-events: none; }
+  #tLabel { position: absolute; left: 0; top: 0; display: none; width: 70px; text-align: center; font-size: 12px; font-weight: 800; color: #ffd9a8; text-shadow: 0 1px 1px #000; will-change: transform; }
+  #tBar { height: 4px; margin-top: 2px; background: #171c33; border: 1px solid #000; overflow: hidden; }
+  #tHp { height: 100%; background: #ff9a3c; transform-origin: left; }
   .hudBtn { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; background: rgba(16,22,48,.84); border: 2px solid var(--line); padding: 0; touch-action: none; }
   #btnPause { top: calc(10px + var(--sat)); right: calc(12px + var(--sar)); width: 46px; height: 46px; border-radius: 10px; }
   #btnPause i { display: block; width: 5px; height: 17px; margin: 0 3px; background: var(--ink); border-radius: 2px; }
   #btnNova { right: calc(14px + var(--sar)); bottom: calc(14px + var(--sab)); width: 78px; height: 78px; border-radius: 50%; border-color: var(--accent); flex-direction: column; font-weight: 800; font-size: 12px; line-height: 1.1; }
   #btnNova b { font-size: 24px; color: var(--accent); }
   #btnNova.empty { opacity: .4; border-color: var(--line); }
+  @media (orientation: portrait) {
+    .hBL { bottom: auto; top: calc(62px + var(--sat)); left: calc(8px + var(--sal)); background: none; padding: 0; gap: 3px; }
+    .hRow span[data-t] { display: none; } .pip { width: 9px; height: 5px; }
+    #hBoss { top: calc(36px + var(--sat)); }
+    #btnNova { width: 66px; height: 66px; right: calc(10px + var(--sar)); bottom: calc(10px + var(--sab)); }
+  }
   @media (max-height: 480px) {
     .scr { gap: 5px; padding-top: calc(6px + var(--sat)); padding-bottom: calc(6px + var(--sab)); justify-content: safe center; }
     #scrMenu h1 { font-size: 28px; } #scrMenu h1 span { display: inline; margin-left: 8px; }
@@ -111,6 +120,7 @@
       <div class="hRow"><span data-t="hGun"></span><span id="hGun" style="display:flex;gap:3px;width:auto"></span></div>
       <div class="hRow"><span data-t="hRkt"></span><span id="hRkt" style="display:flex;gap:3px;width:auto"></span></div>
     </div>
+    <div id="tLabel"><span id="tDist"></span><div id="tBar"><div id="tHp"></div></div></div>
     <div id="hMsg"></div>
     <div id="hPick"></div>
     <div id="hurt"></div>

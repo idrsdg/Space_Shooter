@@ -73,6 +73,10 @@ def detail_map(n=1024):
     wear = np.clip((fbm(n, 9, 1.7) - .28) * 2, 0, 1)
     rgb = np.stack([panels * (.86 + grit * .14), rock, wear * .55 + grit * .45], axis=2)
     save_jpg(rgb, os.path.join(TEX, 'detail.jpg'), 88)
+    height = panels * .8 + grit * .2
+    nx = (np.roll(height, -1, 1) - np.roll(height, 1, 1)) * 2.4
+    ny = (np.roll(height, -1, 0) - np.roll(height, 1, 0)) * 2.4
+    save_jpg(np.stack([np.clip(.5 - nx, 0, 1), np.clip(.5 + ny, 0, 1), np.clip(.35 + wear * .45 + grit * .2, 0, 1)], axis=2), os.path.join(TEX, 'detail_n.jpg'), 90)
 
 
 def setup_pano(w, h, samples):
@@ -208,22 +212,51 @@ def sky(i, spec):
         nt.links.new(dark.outputs[0], mul.inputs[2])
         return mul.outputs[0]
     world_for(fn)
-    setup_pano(2048, 1024, 12)
-    a = render_array()
-    a = np.clip(a, 0, 1) * .86
-    rng = np.random.default_rng(900 + i)
-    h, w = a.shape[:2]
-    tints = np.array([(1, 1, 1), (.8, .88, 1), (1, .9, .76), (.86, .92, 1), (1, .74, .66)])
-    for count, size, lo, hi in ((5200, 1, .4, .85), (760, 2, .7, 1.0), (70, 3, .9, 1.0)):
-        ys = np.clip((np.arcsin(rng.uniform(-1, 1, count)) / np.pi + .5) * h, 0, h - 4).astype(int)
-        xs = rng.integers(0, w - 4, count)
-        for x, y, v, t in zip(xs, ys, rng.uniform(lo, hi, count), rng.integers(0, 5, count)):
-            sx = max(size, int(round(size / max(.25, np.cos((y / h - .5) * np.pi)))))
-            c = tints[t] * v
-            a[y:y + size, x:min(x + sx, w)] = np.maximum(a[y:y + size, x:min(x + sx, w)], c)
-    save_jpg(a, os.path.join(TEX, f'sky{i}.jpg'), 84)
-    lo = (a[:h // 2 * 2, :w // 2 * 2].reshape(h // 2, 2, w // 2, 2, 3).mean(axis=(1, 3)))
-    save_jpg(lo, os.path.join(TEX, f'sky{i}_lo.jpg'), 82)
+    setup_pano(1600, 800, 6)
+    a = np.clip(render_array(), 0, 1) * .8
+    for face, tag in ((512, ''), (336, '_lo')):
+        save_jpg(cube_strip(a, face), os.path.join(TEX, f'neb{i}{tag}.jpg'), 86)
+
+
+def cube_strip(eq, n):
+    """+X -X +Y -Y +Z -Z faces side by side, resampled from the equirect render."""
+    h, w = eq.shape[:2]
+    u = (np.arange(n) + .5) / n * 2 - 1
+    xx, yy = np.meshgrid(u, u)
+    one = np.ones_like(xx)
+    # WebGL cube face conventions, row 0 is the top of each face
+    faces = [(one, -yy, -xx), (-one, -yy, xx), (xx, one, yy), (xx, -one, -yy), (xx, -yy, one), (-xx, -yy, -one)]
+    out = np.zeros((n, n * 6, 3), np.float32)
+    for k, (dx, dy, dz) in enumerate(faces):
+        l = np.sqrt(dx * dx + dy * dy + dz * dz)
+        lon = np.arctan2(dx / l, -dz / l) / (2 * np.pi) + .5
+        lat = .5 - np.arcsin(np.clip(dy / l, -1, 1)) / np.pi
+        fx = lon * w - .5
+        fy = np.clip(lat * h - .5, 0, h - 1.001)
+        x0 = np.floor(fx).astype(int)
+        y0 = np.floor(fy).astype(int)
+        tx, ty = (fx - x0)[..., None], (fy - y0)[..., None]
+        x0 %= w
+        x1 = (x0 + 1) % w
+        c = eq[y0, x0] * (1 - tx) * (1 - ty) + eq[y0, x1] * tx * (1 - ty) + eq[y0 + 1, x0] * (1 - tx) * ty + eq[y0 + 1, x1] * tx * ty
+        out[:, k * n:(k + 1) * n] = c
+    return out
+
+
+def stars():
+    """Crisp star points: unit direction, size, rgb as float32."""
+    r = np.random.default_rng(4242)
+    n = 3000
+    d = r.normal(size=(n, 3))
+    d /= np.linalg.norm(d, axis=1, keepdims=True)
+    mag = r.random(n) ** 3.2
+    size = 1 + mag * 2.1
+    tint = np.array([(1, 1, 1), (.76, .86, 1), (1, .88, .7), (.86, .92, 1), (1, .68, .56)], np.float32)[r.integers(0, 5, n)]
+    rgb = tint * (.34 + mag[:, None] * .66)
+    data = np.column_stack([d, size, rgb]).astype('<f4')
+    os.makedirs(os.path.join(ASSETS, 'mesh'), exist_ok=True)
+    data.tofile(os.path.join(ASSETS, 'mesh', 'stars.bin'))
+    print('stars', n, flush=True)
 
 
 PLANETS = [
@@ -256,8 +289,10 @@ def planet(i, spec):
 for ob in list(bpy.data.objects):
     bpy.data.objects.remove(ob)
 detail_map()
+stars()
 for i, s in enumerate(SKIES):
     sky(i, s)
-for i, p in enumerate(PLANETS):
-    planet(i, p)
+if '--planets' in sys.argv:
+    for i, p in enumerate(PLANETS):
+        planet(i, p)
 print('TEXTURES DONE', flush=True)

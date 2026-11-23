@@ -270,16 +270,18 @@ def warden():
         b.cyl((s * 1.3, -.8, .4), (s * 1.3, -.8, 4.4), .22, .14, 12, 'dark')
         nozzle(b, (s * 1.2, 0, -3.8), .62, .7)
     sh = m.part('shield', (0, 0, 3.4))
-    th = []
-    for i in range(7):
-        a0, a1 = (i - 3.5) * .32, (i - 2.5) * .32
-        for j in range(4):
-            y0, y1 = (j - 2) * 1.32, (j - 1) * 1.32
-            x0, x1, z0, z1 = math.sin(a0) * 6.6, math.sin(a1) * 6.6, math.cos(a0) * 6.6 - 3.2, math.cos(a1) * 6.6 - 3.2
-            cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
-            with sh.at(trans(cx, (y0 + y1) / 2, cz) @ rot_y((a0 + a1) / 2)):
-                col = 'l_cyan' if (i + j) % 3 == 0 else 'teal'
-                sh.box((0, 0, 0), (abs(x1 - x0) * .9 / max(.45, math.cos((a0 + a1) / 2)), 1.2, .24), col)
+    for i in range(9):
+        ang = (i - 4) * .25
+        edge = abs(i - 4) / 4
+        h = 5.6 - edge * 1.7
+        with sh.at(trans(math.sin(ang) * 6.6, 0, math.cos(ang) * 6.6 - 3.2) @ rot_y(ang)):
+            sh.box((0, 0, 0), (1.56, h, .3), 'steel' if i % 2 else 'teal', taper=.96)
+            sh.box((0, 0, .19), (.2, h * .86, .08), 'l_cyan')
+            sh.box((0, h / 2 - .22, .17), (1.3, .16, .1), 'dark')
+            sh.box((0, -h / 2 + .22, .17), (1.3, .16, .1), 'dark')
+            for sd in (1, -1):
+                sh.cyl((sd * .6, h * .36, .14), (sd * .6, h * .36, .24), .07, .06, 8, 'pale')
+                sh.cyl((sd * .6, -h * .36, .14), (sd * .6, -h * .36, .24), .07, .06, 8, 'pale')
     for s, nm in ((1, 'armR'), (-1, 'armL')):
         a = m.part(nm, (s * 2.0, 0, 1.6))
         a.box((s * 3.2, 0, 1.8), (2.6, .5, .7), 'gun')
@@ -388,38 +390,6 @@ def beam_warn():
     return m
 
 
-def muzzle():
-    m = Model('bolt_muzzle', bevel=0, lods=(1.0, .3, .1), ao=False)
-    g = m.part('m')
-    for i in range(8):
-        with g.at(rot_z(i / 8 * TAU)):
-            g.lathe([(float(j) / 10 * 1.6, .34 * (1 - j / 10) + .005) for j in range(11)], 10, ['f_white', 'f_yellow', 'f_orange'], (0, 0, 0), axis='y')
-    return m
-
-
-def reticle():
-    m = Model('reticle', bevel=0, lods=(1.0, .5, .3), ao=False)
-    g = m.part('r')
-    g.torus((0, 0, 0), 1.0, .03, 96, 6, 'l_green', axis='z')
-    for i in range(4):
-        with g.at(rot_z(i / 4 * TAU)):
-            g.box((1.34, 0, 0), (.5, .05, .05), 'l_green')
-            g.box((.72, 0, 0), (.16, .03, .03), 'l_white')
-    g.sphere((0, 0, 0), .05, 12, 8, 'l_white')
-    return m
-
-
-def bracket():
-    m = Model('bracket', bevel=0, lods=(1.0, .5, .3), ao=False)
-    g = m.part('b')
-    for i in range(4):
-        with g.at(rot_z(i / 4 * TAU + .785)):
-            for k in range(24):
-                g.box((1.0, -.22 + k * .018, 0), (.05, .016, .04), 'l_orange')
-                g.box((1.0 - k * .018, -.22, 0), (.016, .05, .04), 'l_orange')
-    return m
-
-
 def dust():
     m = Model('dust', bevel=0, lods=(1.0, .1, .012), ao=False)
     g = m.part('d')
@@ -501,54 +471,215 @@ def scrap():
 
 
 # ---- effects, every chunk a keyed bone ------------------------------------------
-def burst(name, count, frames, radius, seed, pals, chunk=.5, spin_amt=4.0, sub=2, grow=True):
-    m = Model(name, bevel=0, lods=(1.0, .5, .22), ao=False)
+def _dir(r):
+    t, p = r.uniform(0, TAU), r.uniform(-1, 1)
+    q = math.sqrt(1 - p * p)
+    return math.cos(t) * q, p, math.sin(t) * q
+
+
+def spike_burst(name, count, frames, reach, seed, cols, rad=.16, length=1.0, cone=0.0):
+    """Sharp flame blades: each bone aims one spindle outward and stretches it."""
+    m = Model(name, bevel=0, lods=(1.0, .55, .25), ao=False, auto_smooth=70)
     m.flex = 0
     r = random.Random(seed)
     tracks = {}
     for i in range(count):
         nm = f'c{i:02d}'
         g = m.part(nm)
-        size = chunk * r.uniform(.55, 1.35)
-        g.rock((0, 0, 0), size, sub, seed + i, [pals[i % len(pals)]], (r.uniform(.7, 1.3), r.uniform(.7, 1.3), r.uniform(.7, 1.3)), .4)
-        t, p = r.uniform(0, TAU), r.uniform(-1, 1)
-        q = math.sqrt(1 - p * p)
-        d = (math.cos(t) * q, p, math.sin(t) * q)
-        reach = radius * r.uniform(.45, 1.05)
-        delay = r.randint(0, max(1, frames // 8))
-        life = frames - delay
-        rr = (r.uniform(-1, 1) * spin_amt, r.uniform(-1, 1) * spin_amt, r.uniform(-1, 1) * spin_amt)
-        key = lambda u: delay + round(u * life)
-        ease = [(0, 0), (.16, .5), (.4, .82), (.7, .96), (1, 1)]
-        pos = [(key(u), (d[0] * reach * e, d[1] * reach * e, d[2] * reach * e)) for u, e in ease]
-        if delay:
-            pos.insert(0, (0, (0, 0, 0)))
-        rot = [(key(u), (rr[0] * u, rr[1] * u, rr[2] * u)) for u in (0, .5, 1)]
-        if grow:
-            sz = [(0, (.05,) * 3), (key(.08), (.7,) * 3), (key(.28), (1.25,) * 3), (key(.7), (.82,) * 3), (frames, (.02,) * 3)]
-        else:
-            sz = [(0, (1,) * 3), (key(.65), (.9,) * 3), (frames, (.02,) * 3)]
-        tracks[nm] = {'pos': pos, 'rot': rot, 'scl': sz}
+        L = length * r.uniform(.55, 1.3)
+        w = rad * r.uniform(.6, 1.35)
+        if r.random() < .68:  # most tongues are short and full, a few long ones break the silhouette
+            L *= r.uniform(.36, .58)
+            w *= r.uniform(1.5, 2.1)
+        g.lathe([(0, 0), (L * .07, w * .72), (L * .26, w), (L * .55, w * .62), (L * .82, w * .22), (L, 0)], 8, list(cols))
+        d = _dir(r)
+        if cone:
+            d = (d[0] * cone, d[1] * cone, abs(d[2]) + .55)
+            n = math.sqrt(d[0] ** 2 + d[1] ** 2 + d[2] ** 2)
+            d = (d[0] / n, d[1] / n, d[2] / n)
+        yaw, pit = math.atan2(d[0], d[2]), -math.asin(max(-1, min(1, d[1])))
+        roll_end = r.uniform(-.7, .7)
+        delay = r.randint(0, max(1, frames // 7))
+        far = reach * r.uniform(.32, 1.0)
+        peak = r.uniform(.8, 1.25)
+        key = lambda u: min(frames, delay + round(u * (frames - delay)))
+        tracks[nm] = {
+            'rot': [(0, (pit, yaw, 0)), (frames, (pit, yaw, roll_end))],
+            'pos': [(key(u), (d[0] * far * e, d[1] * far * e, d[2] * far * e)) for u, e in ((0, 0), (.3, .62), (.65, .9), (1, 1))],
+            'scl': [(0, (.03,) * 3), (key(.12), (peak,) * 3), (key(.42), (peak * .92,) * 3), (key(.78), (peak * .4,) * 3), (frames, (.02,) * 3)],
+        }
     m.clip('play', frames, tracks, loop=False)
     return m
 
 
+def smoke(name, count, frames, reach, seed, size):
+    m = Model(name, bevel=0, lods=(1.0, .6, .3), ao=False, auto_smooth=180)
+    m.flex = 0
+    r = random.Random(seed)
+    tracks = {}
+    for i in range(count):
+        nm = f'c{i:02d}'
+        g = m.part(nm)
+        g.rock((0, 0, 0), size * r.uniform(.34, .8), 2, seed + i, [['sm_a', 'sm_b', 'sm_c'][i % 3]], (1, r.uniform(.85, 1.12), 1), .07)
+        d = _dir(r)
+        far = reach * r.uniform(.3, 1)
+        delay = r.randint(0, frames // 5)
+        key = lambda u: min(frames, delay + round(u * (frames - delay)))
+        tr = (r.uniform(-1, 1), r.uniform(-1, 1), r.uniform(-1, 1))
+        tracks[nm] = {'pos': [(key(u), (d[0] * far * e, d[1] * far * e + u * size * .7, d[2] * far * e)) for u, e in ((0, .05), (.25, .55), (.6, .86), (1, 1))],
+                      'rot': [(0, (0, 0, 0)), (frames, tr)],
+                      'scl': [(0, (.04,) * 3), (key(.14), (.7,) * 3), (key(.42), (1.05,) * 3), (key(.72), (.62,) * 3), (frames, (.02,) * 3)]}
+    m.clip('play', frames, tracks, loop=False)
+    return m
+
+
+def shards(name, count, frames, reach, seed):
+    m = Model(name, bevel=0, lods=(1.0, .6, .3), ao=False, auto_smooth=25)
+    m.flex = 0
+    r = random.Random(seed)
+    cols = ['steel', 'gun', 'dark', 'pale', 'crimson', 'copper']
+    tracks = {}
+    for i in range(count):
+        nm = f'c{i:02d}'
+        g = m.part(nm)
+        sz = r.uniform(.2, .62)
+        poly = []
+        for k in range(8):
+            a = k / 8 * TAU
+            q = sz * r.uniform(.42, 1.0)
+            poly.append((math.cos(a) * q, math.sin(a) * q * r.uniform(.5, 1.1)))
+        g.plate(poly, sz * .16, cols[i % len(cols)], edge='f_orange' if i % 5 == 0 else 'dark')
+        d = _dir(r)
+        far = reach * r.uniform(.35, 1.05)
+        sp = (r.uniform(-9, 9), r.uniform(-9, 9), r.uniform(-9, 9))
+        tracks[nm] = {'pos': [(round(u * frames), (d[0] * far * e, d[1] * far * e, d[2] * far * e)) for u, e in ((0, 0), (.14, .46), (.4, .78), (.72, .94), (1, 1))],
+                      'rot': [(round(u * frames), (sp[0] * u, sp[1] * u, sp[2] * u)) for u in (0, .34, .67, 1)],
+                      'scl': [(0, (1,) * 3), (round(frames * .72), (.92,) * 3), (frames, (.02,) * 3)]}
+    m.clip('play', frames, tracks, loop=False)
+    return m
+
+
+def imp_shield():
+    m = Model('imp_shield', bevel=0, lods=(1.0, .7, .4), ao=False, auto_smooth=30)
+    m.flex = 0
+    r = random.Random(77)
+    tracks = {}
+    cells = [(0, 0)]
+    for ring in range(1, 4):
+        for k in range(ring * 6):
+            a = k / (ring * 6) * TAU
+            cells.append((math.cos(a) * ring * .62, math.sin(a) * ring * .62))
+    for i, (x, y) in enumerate(cells[:32]):
+        nm = f'c{i:02d}'
+        g = m.part(nm, (x, y, 0))
+        g.lathe([(-.05, 0), (-.02, .3), (.03, .3), (.06, 0)], 6, ['f_blue', 'f_cyan', 'f_white'], (x, y, 0), phase=math.pi / 6)
+        d = math.hypot(x, y)
+        t0 = round(d * 2.4)
+        tracks[nm] = {'scl': [(0, (.02,) * 3), (t0, (.02,) * 3), (t0 + 2, (1.05,) * 3), (t0 + 6, (.72,) * 3), (16, (.02,) * 3)],
+                      'pos': [(0, (0, 0, 0)), (t0 + 2, (0, 0, .12)), (16, (0, 0, -.05 + r.uniform(0, .04)))]}
+    m.clip('play', 16, tracks, loop=False)
+    return m
+
+
 def shock():
-    m = Model('shock', bevel=0, lods=(1.0, .5, .25), ao=False)
+    m = Model('shock', bevel=0, lods=(1.0, .5, .25), ao=False, auto_smooth=60)
     m.flex = 0
     tracks = {}
-    n = 26
+    n = 28
     for i in range(n):
         nm = f's{i:02d}'
-        g = m.part(nm)
-        a0, a1 = i / n * TAU, (i + .8) / n * TAU
-        with g.at(rot_z((a0 + a1) / 2)):
-            g.lathe([(float(j) / 8 * .9 - .45, .05 + .04 * math.sin(j / 8 * math.pi)) for j in range(9)], 10, 'f_orange' if i % 2 else 'f_yellow', (1, 0, 0), axis='y')
-        c, s = math.cos((a0 + a1) / 2), math.sin((a0 + a1) / 2)
-        tracks[nm] = {'pos': [(0, (0, 0, 0)), (6, (c * 2.2, s * 2.2, 0)), (20, (c * 3.6, s * 3.6, 0))],
-                      'scl': [(0, (.4,) * 3), (6, (1.1,) * 3), (20, (.02,) * 3)]}
+        a = (i + .5) / n * TAU
+        c, s_ = math.cos(a), math.sin(a)
+        g = m.part(nm, (c, s_, 0))
+        with g.at(trans(c, s_, 0) @ rot_z(a)):
+            g.lathe([(-.13, 0), (-.08, .018), (.0, .03), (.08, .018), (.13, 0)], 10, ['f_orange', 'f_yellow', 'f_white', 'f_yellow'], axis='y')
+        tracks[nm] = {'pos': [(0, (-c * .92, -s_ * .92, 0)), (5, (c * .9, s_ * .9, 0)), (11, (c * 1.9, s_ * 1.9, 0)), (20, (c * 2.6, s_ * 2.6, 0))],
+                      'scl': [(0, (.5,) * 3), (5, (1.5,) * 3), (12, (1.0,) * 3), (20, (.02,) * 3)]}
     m.clip('play', 20, tracks, loop=False)
     return m
+
+
+def tracer(name, cols):
+    m = Model(name, bevel=0, lods=(1.0, .24, .05), ao=False, auto_smooth=120)
+    g = m.part('t')
+    prof = [(.5 - i / 20, .5 * min(1, (i / 20) * 7) ** .6 * (1 - i / 20) ** .55 + .002) for i in range(21)]
+    prof[0] = (.5, 0)
+    prof[-1] = (-.5, 0)
+    bands = [cols[min(len(cols) - 1, int(i / 20 * len(cols)))] for i in range(20)]
+    g.lathe(prof, 26, bands)
+    return m
+
+
+def muzzle():
+    m = Model('bolt_muzzle', bevel=0, lods=(1.0, .35, .12), ao=False, auto_smooth=70)
+    g = m.part('m')
+    spin_ = [(0, 2.5, .26), (1, .95, .17), (2, 1.4, .2), (3, .95, .17), (4, 1.9, .22), (5, .95, .17), (6, 1.4, .2), (7, .95, .17)]
+    for k, L, w in spin_:
+        with g.at(rot_z(k / 8 * TAU)):
+            g.lathe([(0, w), (L * .2, w * .82), (L * .5, w * .42), (L * .8, w * .12), (L, 0)], 14, ['f_white', 'f_yellow', 'f_orange', 'f_red'], axis='y')
+    g.lathe([(0, .3), (.8, .22), (1.7, .1), (2.6, 0)], 16, ['f_white', 'f_white', 'f_yellow'])
+    return m
+
+
+def aimline():
+    m = Model('aimline', bevel=0, lods=(1.0, .5, .2), ao=False, auto_smooth=120)
+    g = m.part('a')
+    g.lathe([(i / 36 - .5, 1.0) for i in range(37)], 16, ['l_cyan', 'dark'] * 18)
+    return m
+
+
+def puff():
+    m = Model('puff', bevel=0, lods=(1.0, .12, .03), ao=False, auto_smooth=180)
+    g = m.part('p')
+    g.rock((0, 0, 0), 1.0, 4, 91, ['smoke_b', 'smoke_a', 'smoke_b'], (1, .9, 1), .2)
+    return m
+
+
+def _strip(g, a, b, w, pal, n=24):
+    ax, ay = a
+    bx, by = b
+    ln = math.hypot(bx - ax, by - ay) or 1
+    ang = math.atan2(by - ay, bx - ax)
+    for i in range(n):
+        u = (i + .5) / n
+        with g.at(trans(ax + (bx - ax) * u, ay + (by - ay) * u, 0) @ rot_z(ang)):
+            g.box((0, 0, 0), (ln / n * 1.02, w, .01), pal)
+
+
+def hud_cross():
+    m = Model('hud_cross', bevel=0, lods=(1.0, .7, .5), ao=False)
+    g = m.part('h')
+    for k in range(4):
+        with g.at(rot_z(k / 4 * TAU)):
+            _strip(g, (.42, 0), (1.0, 0), .075, 'l_green', 18)
+            _strip(g, (.42, .06), (.42, -.06), .05, 'l_white', 4)
+    for k in range(4):
+        a0, a1 = (k + .12) / 4 * TAU, (k + .38) / 4 * TAU
+        for j in range(10):
+            u0, u1 = a0 + (a1 - a0) * j / 10, a0 + (a1 - a0) * (j + 1) / 10
+            _strip(g, (math.cos(u0) * .78, math.sin(u0) * .78), (math.cos(u1) * .78, math.sin(u1) * .78), .035, 'l_green', 2)
+    g.lathe([(-.01, 0), (0, .07), (.01, .07), (.012, 0)], 16, 'l_white')
+    return m
+
+
+def hud_shape(name, lines, pal, w=.09, n=24):
+    m = Model(name, bevel=0, lods=(1.0, .7, .5), ao=False)
+    g = m.part('h')
+    for a, b in lines:
+        _strip(g, a, b, w, pal, n)
+    return m
+
+
+def hud_marks():
+    corners = []
+    for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        corners += [((sx, sy), (sx * .58, sy)), ((sx, sy), (sx, sy * .58))]
+    return [hud_cross(),
+            hud_shape('hud_lock', corners, 'l_orange', .07, 12),
+            hud_shape('hud_lead', [((0, .62), (.62, 0)), ((.62, 0), (0, -.62)), ((0, -.62), (-.62, 0)), ((-.62, 0), (0, .62))], 'l_yellow', .11, 24),
+            hud_shape('hud_hit', [((.34, .34), (1, 1)), ((-.34, .34), (-1, 1)), ((.34, -.34), (1, -1)), ((-.34, -.34), (-1, -1))], 'l_white', .13, 24),
+            hud_shape('hud_kill', [((.3, .3), (1.1, 1.1)), ((-.3, .3), (-1.1, 1.1)), ((.3, -.3), (1.1, -1.1)), ((-.3, -.3), (-1.1, -1.1))], 'l_red', .17, 24),
+            hud_shape('hud_arrow', [((1, 0), (-.5, .8)), ((1, 0), (-.5, -.8)), ((-.5, .8), (-.1, 0)), ((-.5, -.8), (-.1, 0))], 'l_red', .16, 24)]
 
 
 # ---- bosses -----------------------------------------------------------------
@@ -983,17 +1114,20 @@ def build_all():
     for sz, (nm, r) in enumerate((('S', 4.0), ('M', 7.0), ('L', 11.0))):
         for v in range(3):
             out.append(rock(f'rock{nm}{v}', r, 300 + sz * 10 + v, rp[v], [(1, .82, 1.1), (1.18, .86, .92), (.9, 1.08, 1.0)][v]))
-    for nm, cols, rd, ln in (('bolt_p', ['f_white', 'f_cyan', 'f_blue'], .17, 3.4), ('bolt_h', ['f_white', 'f_yellow', 'f_orange'], .27, 4.2),
-                             ('bolt_e0', ['f_white', 'f_red', 'f_orange'], .3, 2.6), ('bolt_e3', ['f_white', 'f_green', 'f_green'], .32, 3.0)):
+    for nm, cols, rd, ln in (('bolt_e0', ['f_white', 'f_red', 'f_orange'], .3, 2.6), ('bolt_e3', ['f_white', 'f_green', 'f_green'], .32, 3.0)):
         out.append(bolt(nm, cols, rd, ln))
     out += [orb_shot('bolt_e1', ('f_magenta', 'f_white'), .62), orb_shot('bolt_e2', ('f_orange', 'f_yellow'), .74), orb_shot('bolt_e4', ('f_violet', 'f_white'), .68),
-            beam(), beam_warn(), muzzle(), reticle(), bracket(), dust()]
+            beam(), beam_warn(), muzzle(), dust(), aimline(), puff(), tracer('tr_p', ['f_white', 'f_white', 'f_cyan', 'f_blue']), tracer('tr_h', ['f_white', 'f_yellow', 'f_orange', 'f_red'])] + hud_marks()
     out += [pickup('w', 'orange', 'l_orange', icon_gun), pickup('r', 'crimson', 'l_red', icon_rkt), pickup('s', 'cyan', 'l_cyan', icon_shield),
             pickup('h', 'green', 'l_green', icon_cross), pickup('b', 'violet', 'l_violet', icon_nova), pickup('o', 'amber', 'l_yellow', icon_bolt), scrap()]
-    fire = ['f_white', 'f_yellow', 'f_orange', 'f_orange', 'f_red', 'smoke_b', 'smoke_a']
-    out += [burst('boom_s', 30, 22, 3.8, 401, fire, .62), burst('boom_m', 42, 30, 7.2, 402, fire, .95), burst('boom_l', 60, 42, 13.0, 403, fire, 1.5),
-            burst('boom_hit', 26, 10, 1.3, 404, ['f_white', 'f_yellow', 'f_orange'], .18, sub=2),
-            burst('debris', 34, 48, 12.0, 405, ['steel', 'gun', 'dark', 'crimson', 'scorch'], .5, 9.0, grow=False), shock()]
+    fire = ('f_white', 'f_yellow', 'f_orange', 'f_orange', 'f_red')
+    out += [spike_burst('boom_s', 40, 20, 2.4, 401, fire, .27, 4.0), spike_burst('boom_m', 56, 27, 4.4, 402, fire, .42, 7.0), spike_burst('boom_l', 76, 36, 8.0, 403, fire, .68, 12.5),
+            spike_burst('fx_flash', 26, 7, .4, 406, ('f_white', 'f_white', 'f_yellow', 'f_orange', 'f_orange'), .3, 4.4),
+            spike_burst('sparks', 34, 24, 13.0, 407, ('f_white', 'f_yellow', 'f_yellow', 'f_orange', 'f_red'), .05, 2.2),
+            spike_burst('boom_hit', 26, 9, 1.5, 404, ('f_white', 'f_yellow', 'f_orange', 'f_orange', 'f_red'), .07, 1.5, cone=.8),
+            spike_burst('imp_armor', 28, 11, 2.4, 408, ('f_white', 'f_white', 'f_yellow', 'f_orange', 'f_orange'), .05, 2.0, cone=1.1), imp_shield(),
+            smoke('smoke_s', 30, 36, 3.8, 411, .95), smoke('smoke_m', 36, 46, 7.0, 412, 1.6), smoke('smoke_l', 44, 60, 12.0, 413, 2.5),
+            shards('debris', 40, 48, 12.0, 405), shock()]
     out += [boss0_core(), boss0_arm('boss0_armR', 1), boss0_arm('boss0_armL', -1), boss1_core(), boss1_emitter(), boss2_core(), boss2_gun('boss2_gunR', 1), boss2_gun('boss2_gunL', -1)]
     out += [ck_shell(), ck_stick(), ck_throttle(), ck_gauge('ck_gauge_hull', 'l_green'), ck_gauge('ck_gauge_heat', 'l_cyan'),
             led('ck_led_g', 'l_green'), led('ck_led_r', 'l_red'), led('ck_led_off', 'dark'), led('ck_led_c', 'l_cyan'), led('ck_led_a', 'l_orange')]

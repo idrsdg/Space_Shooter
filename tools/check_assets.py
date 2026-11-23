@@ -9,7 +9,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 A = os.path.join(ROOT, 'assets')
 MIN_TRIS, MIN_BONES = 1000, 24
 # Rigid props that never animate. Everything else must carry a rig.
-STATIC_PREFIXES = ('rock', 'bolt', 'beam', 'station', 'planet', 'ring', 'sky', 'dust', 'ck_shell', 'ck_led', 'reticle', 'bracket')
+STATIC_PREFIXES = ('rock', 'bolt', 'tr_', 'beam', 'aimline', 'puff', 'station', 'planet', 'ring', 'sky', 'dust', 'ck_shell', 'ck_led', 'hud_')
 
 
 def main():
@@ -24,6 +24,9 @@ def main():
             bad.append(f'{name}: highest LOD has {tris[0]} triangles (< {MIN_TRIS})')
         if any(a < b for a, b in zip(tris, tris[1:])):
             bad.append(f'{name}: LOD triangle counts are not descending {tris}')
+        phone = [l['ic'] // 3 for l in d['lod'] if l['bin'] != 'hi']
+        if not phone or phone[0] < MIN_TRIS:
+            bad.append(f'{name}: phone tier top LOD has {phone[:1]} triangles (< {MIN_TRIS})')
         nb = len(d['bones'])
         static = name.startswith(STATIC_PREFIXES)
         if not static and nb < MIN_BONES:

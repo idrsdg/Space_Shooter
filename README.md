@@ -26,4 +26,6 @@ Bütün modeller, dokular ve animasyonlar Blender 5.3 ile `tools/` içindeki bet
 
 `check_assets.py` şu durumlarda hata verir: bir modelin en yakın LOD'u 1.000 üçgenin altındaysa, animasyonlu bir modelin armature'ı 24 bone'dan azsa ya da hareket etmeyen bir bone varsa.
 
+Telefonlar `models_hi.bin` dosyasını indirmez. Otomatik kalite sistemi kare süresi yükselince önce LOD ve ikincil efektleri, sonra render ölçeğini düşürür.
+
 `?debug=1` yalnız test kancalarını açar.

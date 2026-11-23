@@ -16,7 +16,7 @@ TAU = math.tau
 MIN_TRIS = 1000
 MIN_BONES = 24
 
-# name: (r, g, b, material)   material 0 metal, 1 rock, 2 glass, 3 flame, 4 lit panel
+# name: (r, g, b, material)   material 0 metal, 1 rock, 2 glass, 3 flame, 4 lit panel, 5 smoke
 PALETTE = {
     'steel': (.52, .57, .66, 0), 'gun': (.22, .25, .31, 0), 'dark': (.10, .12, .17, 0), 'pale': (.82, .85, .88, 0),
     'crimson': (.80, .11, .17, 0), 'wine': (.42, .06, .13, 0), 'orange': (.95, .42, .07, 0), 'amber': (.96, .68, .10, 0),
@@ -32,6 +32,7 @@ PALETTE = {
     'l_red': (.96, .16, .14, 4), 'l_orange': (1.0, .52, .08, 4), 'l_yellow': (1.0, .86, .16, 4), 'l_green': (.20, .92, .36, 4),
     'l_cyan': (.20, .86, 1.0, 4), 'l_blue': (.20, .46, 1.0, 4), 'l_violet': (.66, .36, 1.0, 4), 'l_magenta': (1.0, .28, .72, 4), 'l_white': (.92, .95, 1.0, 4),
     'ring_a': (.78, .58, .34, 1), 'ring_b': (.55, .40, .28, 1), 'ring_c': (.74, .76, .82, 1), 'ring_d': (.48, .52, .62, 1), 'dust': (.50, .57, .72, 4),
+    'sm_a': (.30, .28, .29, 5), 'sm_b': (.44, .40, .38, 5), 'sm_c': (.20, .18, .19, 5),
     'smoke_a': (.20, .19, .20, 1), 'smoke_b': (.34, .31, .30, 1), 'scorch': (.13, .10, .09, 1),
 }
 PAL_NAMES = list(PALETTE)
@@ -607,7 +608,8 @@ class Packer:
         out = []
         for i, l in enumerate(lods):
             vb, ib, bits = pack_lod(l, q)
-            target = 'hi' if i == 0 else 'base'
+            # phones skip the 'hi' bin, so LOD0 stays in base unless LOD1 still meets the 1,000 triangle floor
+            target = 'hi' if i == 0 and lods[1]['tri'].shape[0] >= MIN_TRIS else 'base'
             vo = self._put(target, vb, 4)
             io = self._put(target, ib, 4)
             out.append({'bin': target, 'vo': vo, 'vc': len(l['pos']), 'io': io, 'ic': int(l['tri'].size), 'bits': bits})
