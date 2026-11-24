@@ -293,9 +293,9 @@
   const UCK = { uAnim: U.uAnim, uDetail: U.uDetail, uDetailN: U.uDetailN, uEnv: U.uEnv, uSun: { value: new THREE.Vector3(.2, .85, .5).normalize() }, uSunC: { value: new THREE.Vector3(.72, .74, .8) }, uAmb: { value: new THREE.Vector3(.5, .54, .68) },
     uFog: { value: new THREE.Vector3() }, uEye: { value: new THREE.Vector3() }, uFogN: { value: 90 }, uFogF: { value: 100 }, uAW: U.uAW };
 
-  const CAPS = { rock: 14, tr_: 150, bolt_e: 130, bolt_muzzle: 4, pick_scrap: 36, pick: 6, boom: 12, fx_flash: 10, sparks: 12, imp_: 12, smoke: 10, debris: 10, shock: 8, puff: 70, aimline: 2, hud_: 10, default: 14 };
-  const LOD0_CAP = { tr_: 4, bolt: 4, rock: 3, pick: 2, boom: 2, fx_: 2, sparks: 2, imp_: 2, smoke: 2, debris: 2, shock: 2, puff: 3, ck_led: 10, hud_: 10, aimline: 2, default: 3 };
-  const PHONE_CAP = { boom_hit: 3, imp_: 3, boom_: 5, fx_flash: 3, sparks: 4, smoke: 3, debris: 4, shock: 3, puff: 30, default: 0 };
+  const CAPS = { deco: 70, rock: 14, tr_: 150, bolt_e: 130, bolt_muzzle: 4, pick_scrap: 36, pick: 6, boom: 12, fx_flash: 10, sparks: 12, imp_: 12, smoke: 10, debris: 10, shock: 8, puff: 70, aimline: 2, hud_: 10, default: 14 };
+  const LOD0_CAP = { deco: 2, tr_: 4, bolt: 4, rock: 3, pick: 2, boom: 2, fx_: 2, sparks: 2, imp_: 2, smoke: 2, debris: 2, shock: 2, puff: 3, ck_led: 10, hud_: 10, aimline: 2, default: 3 };
+  const PHONE_CAP = { deco: 30, boom_hit: 3, imp_: 3, boom_: 5, fx_flash: 3, sparks: 4, smoke: 3, debris: 4, shock: 3, puff: 30, default: 0 };
   const prefixKey = (n, tbl) => { for (const k in tbl) if (k !== 'default' && n.startsWith(k)) return tbl[k]; return tbl.default; };
 
   let manifest = null;
@@ -319,7 +319,7 @@
     this.l0cap = name === 'dust' ? 2 : prefixKey(name, LOD0_CAP);
     this.noFog = /^(station|ring)/.test(name) ? 1 : 0;
     this.isBoom = /^boom_[sml]$/.test(name);
-    this.optional = /^(smoke|sparks|debris|shock|puff|dust|fx_|imp_|boom_hit)/.test(name);
+    this.optional = /^(deco|smoke|sparks|debris|shock|puff|dust|fx_|imp_|boom_hit)/.test(name);
     const lods = def.lod.filter(l => !(LOW && l.bin === 'hi'));
     this.tris = lods.map(l => l.ic / 3);
     this.last = lods.length - 1;
@@ -475,7 +475,7 @@
     tx.minFilter = THREE.LinearFilter; tx.magFilter = THREE.LinearFilter; tx.generateMipmaps = false; tx.flipY = false; tx.needsUpdate = true;
     return tx;
   }
-  let skyMesh, planetMesh, starMesh, skyTex = [], planetTex = [];
+  let moons = [], skyMesh, planetMesh, starMesh, skyTex = [], planetTex = [];
   const SkyU = { uA: { value: null }, uB: { value: null }, uMix: { value: 1 } };
   const StarU = { uPx: { value: 1 } };
   const PlanetU = { uMap: { value: null }, uSun: U.uSun, uEye: U.uEye, uAtm: { value: new THREE.Vector3() }, uSpin: { value: 0 } };
@@ -546,6 +546,11 @@
     starMesh.frustumCulled = false; starMesh.renderOrder = 9; starMesh.matrixAutoUpdate = false; scene.add(starMesh);
     planetMesh = new THREE.Mesh(geoOf('planet0'), new THREE.ShaderMaterial({ vertexShader: PLANET_VS, fragmentShader: PLANET_FS, uniforms: PlanetU }));
     planetMesh.frustumCulled = false; planetMesh.matrixAutoUpdate = false; scene.add(planetMesh);
+    // scenery: three rock shapes for the passing belt, and moons with their own map and air colour (planet geometry and textures already loaded)
+    ['rockL0', 'rockM1', 'rockS2'].forEach((n, k) => { BT['deco' + k] = new Batch('deco' + k, manifest.models[n], bins, 0); });
+    for (let j = 0; j < (LOW ? 2 : 3); j++) { const u = { uMap: { value: planetTex[0] }, uSun: U.uSun, uEye: U.uEye, uAtm: { value: new THREE.Vector3() }, uSpin: { value: j * 2 } };
+      const m = new THREE.Mesh(planetMesh.geometry, new THREE.ShaderMaterial({ vertexShader: PLANET_VS, fragmentShader: PLANET_FS, uniforms: u })); m.frustumCulled = false; m.matrixAutoUpdate = false; m.visible = false; scene.add(m);
+      moons.push({ m, u, x: 0, y: 0, z: 0, s: 1, v: 1, on: false, wait: 2 + j * 9 }); }
     applySector(0, true);
 
     // compile every shader and upload every buffer and texture now, so nothing can hitch on first use in play
@@ -1407,6 +1412,46 @@
   const EB_MODEL = ['bolt_e0', 'bolt_e1', 'bolt_e2', 'bolt_e3', 'bolt_e4'];
   const ROCK_NAMES = { rockS: ['rockS0', 'rockS1', 'rockS2'], rockM: ['rockM0', 'rockM1', 'rockM2'], rockL: ['rockL0', 'rockL1', 'rockL2'] };
 
+  // 2026-11-24 İdris: "çok fazla göktaşı, gezegen ... olsun, sürekli biz içinden geçelim hepsinin etrafından ... başka hava araçları da olsun".
+  // Scenery that never collides and never sits in the firing lane: a belt of tumbling rocks streaming past, moons that grow and slide by, allied wings
+  // overtaking us, and big hulls drifting alongside. All of it reuses baked models; phones get fewer of each and the rocks drop first under the budget.
+  const DECO_N = LOW ? 28 : 66, deco = new Float32Array(DECO_N * 8);
+  function decoSpawn(i, z) { const o = i * 8; let x, y; do { x = rnd(-320, 320); y = rnd(-180, 180); } while (abs(x) < 72 && abs(y) < 50);
+    deco[o] = x; deco[o + 1] = y; deco[o + 2] = z; deco[o + 3] = rnd(0, 6.28); deco[o + 4] = rnd(0, 6.28); deco[o + 5] = rnd(-.7, .7); deco[o + 6] = .45 + random() ** 2 * 4.2; deco[o + 7] = floor(random() * 3); }
+  for (let i = 0; i < DECO_N; i++) decoSpawn(i, rnd(-1150, 0));
+  const wings = [], hull = { on: false, wait: 14, x: 0, y: 0, z: 0, s: 1, k: 0, side: 1 }; let wingWait = 6;
+  function drawScenery(dt, moving) {
+    const s = SECTORS[S.sector], sp = moving ? 150 : 34, e = U.uEye.value, mv = moving ? 1 : .25;
+    for (let i = 0; i < DECO_N; i++) {
+      const o = i * 8; let z = deco[o + 2] + sp * dt * (.85 + deco[o + 6] * .04);
+      if (z > 60) { decoSpawn(i, rnd(-1200, -1000)); z = deco[o + 2]; }
+      deco[o + 2] = z; deco[o + 3] += deco[o + 5] * dt; deco[o + 4] += deco[o + 5] * .7 * dt;
+      eulerQ(deco[o + 3], deco[o + 4], deco[o + 3] * .5);
+      BT['deco' + deco[o + 7]].push(deco[o] + e.x * .2, deco[o + 1] + e.y * .2, z, Q.x, Q.y, Q.z, Q.w, deco[o + 6], 0, 0, 0);
+    }
+    for (let j = 0; j < moons.length; j++) {
+      const M = moons[j];
+      if (!M.on) { M.wait -= dt * mv; if (M.wait > 0) continue; const side = (j + floor(S.clock / 7)) % 2 ? 1 : -1, pk = (s.planet + 1 + j) % 4;
+        M.on = true; M.z = -2700; M.x = side * rnd(420, 760); M.y = rnd(-280, 280); M.s = rnd(40, 115); M.v = rnd(55, 85);
+        M.u.uMap.value = planetTex[pk]; const a = SECTORS[pk].atm; M.u.uAtm.value.set(a[0], a[1], a[2]); }
+      M.z += M.v * dt * mv; M.u.uSpin.value += dt * .03;
+      if (M.z > 400) { M.on = false; M.wait = rnd(6, 16); M.m.visible = false; continue; }
+      M.m.visible = true; M.m.position.set(M.x * bgK, M.y + bgY * .4, M.z); M.m.scale.setScalar(M.s * bgS); M.m.updateMatrix(); M.m.updateMatrixWorld(true);
+    }
+    wingWait -= dt * mv;
+    if (wingWait <= 0 && wings.length < 2) { wingWait = rnd(8, 15); const side = random() < .5 ? -1 : 1; wings.push({ x: side * rnd(85, 190), y: rnd(-70, 90), z: 70, v: -rnd(120, 175), bank: side * .5, ph: rnd(0, 9) }); }
+    const pc = BT.player.def.clips.idle;
+    for (let w = wings.length - 1; w >= 0; w--) {
+      const W = wings[w]; W.z += W.v * dt; W.bank *= 1 - min(1, dt * .6);
+      if (W.z < -1300) { wings.splice(w, 1); continue; }
+      for (let q = 0; q < 3; q++) { const ox = q === 0 ? 0 : (q === 1 ? -11 : 11), oz = q === 0 ? 0 : 10, oy = q === 0 ? 0 : -3;
+        headingQ(-W.bank * .3, 0, -1, W.bank + sin(S.clock * 1.3 + W.ph + q) * .08);
+        BT.player.push(W.x + ox, W.y + oy + sin(S.clock + W.ph + q) * 1.2, W.z + oz, Q.x, Q.y, Q.z, Q.w, 1.35, pc.base, clipFrame(pc, S.clock + q), 0); }
+    }
+    if (!hull.on) { hull.wait -= dt * mv; if (hull.wait <= 0) { hull.on = true; hull.side = random() < .5 ? -1 : 1; hull.x = hull.side * rnd(250, 360); hull.y = rnd(-110, 110); hull.z = -1700; hull.s = rnd(1.5, 2.3); hull.k = (s.station + 1 + floor(random() * 3)) % 4; } }
+    else { hull.z += 48 * dt * mv; if (hull.z > 350) { hull.on = false; hull.wait = rnd(18, 32); }
+      else { const fade = clamp((hull.z + 1700) / 300, 0, 1); eulerQ(.12, hull.side * .5 + S.clock * .01, .05); BT['station' + hull.k].push(hull.x * bgK, hull.y, hull.z, Q.x, Q.y, Q.z, Q.w, hull.s * fade, 0, 0, 0, LOW ? 1 : undefined); } }
+  }
   function drawBackdrop(dt, moving) {
     const s = SECTORS[S.sector];
     if (SkyU.uMix.value < 1) SkyU.uMix.value = min(1, SkyU.uMix.value + dt / 2.2);
@@ -1616,6 +1661,7 @@
       drawCockpit(S.clock);
       drawBackdrop(dt, S.mode === 'play');
       drawWorld();
+      drawScenery(dt, S.mode === 'play');
       drawOverlay(S.clock);
     } else {
       const a = S.clock * .25;
