@@ -475,7 +475,7 @@
     tx.minFilter = THREE.LinearFilter; tx.magFilter = THREE.LinearFilter; tx.generateMipmaps = false; tx.flipY = false; tx.needsUpdate = true;
     return tx;
   }
-  let moons = [], skyMesh, planetMesh, starMesh, skyTex = [], planetTex = [];
+  let planetT = 0, moons = [], skyMesh, planetMesh, starMesh, skyTex = [], planetTex = [];
   const SkyU = { uA: { value: null }, uB: { value: null }, uMix: { value: 1 } };
   const StarU = { uPx: { value: 1 } };
   const PlanetU = { uMap: { value: null }, uSun: U.uSun, uEye: U.uEye, uAtm: { value: new THREE.Vector3() }, uSpin: { value: 0 } };
@@ -1456,10 +1456,15 @@
     const s = SECTORS[S.sector];
     if (SkyU.uMix.value < 1) SkyU.uMix.value = min(1, SkyU.uMix.value + dt / 2.2);
     PlanetU.uSpin.value += dt * .012;
+    // 2026-11-24 İdris: "bir tane sabit gezegen var havada": the sector's planet drifts too, slowly across the sky and nearer and farther, as if we
+    // were flying round it; its ring goes with it
+    if (moving) planetT += dt;
+    const pdx = sin(planetT * .021) * 150 * bgK, pdy = sin(planetT * .016 + 1) * 60, pdz = sin(planetT * .012) * 260 + 120, px = s.pPos[0] * bgK + pdx, py = s.pPos[1] + bgY + pdy, pz = s.pPos[2] + pdz;
+    planetMesh.position.set(px, py, pz); planetMesh.updateMatrix(); planetMesh.updateMatrixWorld(true);
     const st = BT['station' + s.station];
     eulerQ(.25, S.clock * .05, S.clock * .035);
     st.push(s.sPos[0] * bgK, s.sPos[1], s.sPos[2], Q.x, Q.y, Q.z, Q.w, s.sS * (ckTall ? .8 : 1), 0, 0, 0, LOW ? 0 : 1);
-    if (s.ring) { const r = BT[s.ring]; eulerQ(.42, .2, -.3); r.push(s.pPos[0] * bgK, s.pPos[1] + bgY, s.pPos[2], Q.x, Q.y, Q.z, Q.w, s.pS * bgS, 0, 0, 0, 0); }
+    if (s.ring) { const r = BT[s.ring]; eulerQ(.42, .2, -.3); r.push(px, py, pz, Q.x, Q.y, Q.z, Q.w, s.pS * bgS, 0, 0, 0, 0); }
     const b = BT.dust, sp = moving ? 150 : 34, e = U.uEye.value, ls = 1.2 + sp * .03;
     for (let i = 0; i < DUST_N; i++) {
       let z = dust[i * 3 + 2] + sp * dt;
